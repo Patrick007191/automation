@@ -1,0 +1,33 @@
+# === Credenciais e Configurações Sensíveis ===
+.env
+.env.local
+*.env.local
+secrets.toml
+
+# === Dependências ===
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# === Downloads e Arquivos Gerados ===
+downloads/
+*.pdf
+*.html
+_debug_*
+
+# === IDE e Sistema ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# === Ambiente Virtual ===
+venv/
+.venv/
+env/
