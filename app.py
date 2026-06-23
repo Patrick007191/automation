@@ -8,9 +8,11 @@ import queue
 from pathlib import Path
 from flask import Flask, render_template, request, Response, jsonify
 from dotenv import load_dotenv
-from playwright.sync_api import sync_playwright
 
 load_dotenv()
+
+# NOTA: playwright importado APENAS dentro de run_automation()
+# para evitar travamento na inicialização do servidor
 
 # === DETECTA AMBIENTE: cloud vs local ===
 IS_CLOUD = os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER') or os.environ.get('DYNO')
@@ -56,6 +58,7 @@ def run_automation(processos):
       5. Na nova aba, clica no símbolo ">>" para baixar
       6. Salva o PDF em D:\\Processos
     """
+    from playwright.sync_api import sync_playwright
     global execution_active
     execution_active = True
 
