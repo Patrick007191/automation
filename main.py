@@ -11,6 +11,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # Importa o app do Flask do módulo app
 from app import app
 
+# Rota de health check para Railway/Render
+@app.route('/health')
+def health():
+    return 'OK', 200
+
+@app.route('/ping')
+def ping():
+    return 'pong', 200
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     host = os.environ.get('HOST', '0.0.0.0')
