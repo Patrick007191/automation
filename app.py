@@ -1,4 +1,4 @@
-import os, re, time, json, threading, queue, string
+import os, re, time, json, threading, queue, string, sys
 from pathlib import Path
 from flask import Flask, render_template, request, Response, jsonify
 from dotenv import load_dotenv
@@ -10,25 +10,34 @@ SITE_URL = os.getenv('SITE_URL', 'https://protocolo.manaus.am.gov.br/proton/logi
 SITE_LOGIN = os.getenv('SITE_LOGIN', '')
 SITE_SENHA = os.getenv('SITE_SENHA', '')
 
-# Detecta automaticamente HD externo (pula C:)
+# Detecta ambiente: cloud ou local
+IS_CLOUD = bool(os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER') or os.environ.get('DYNO'))
+if not IS_CLOUD and not sys.platform.startswith('win'):
+    IS_CLOUD = True
+HEADLESS = os.environ.get('HEADLESS', 'true' if IS_CLOUD else 'false').lower() == 'true'
+
+print(f'[INIT] Modo: {"CLOUD" if IS_CLOUD else "LOCAL"} - headless={HEADLESS}', flush=True)
+
+# Detecta automaticamente HD externo (apenas Windows local)
 PASTA_DESTINO = None
-for letra in string.ascii_uppercase:
-    if letra == 'C':
-        continue
-    caminho = f"{letra}:\\"
-    if os.path.exists(caminho):
-        pasta = f"{letra}:\\Processos_SIGED"
-        try:
-            os.makedirs(pasta, exist_ok=True)
-            PASTA_DESTINO = pasta
-            print(f'[INIT] HD detectado em {letra}:\\', flush=True)
-            break
-        except:
-            pass
+if sys.platform.startswith('win'):
+    for letra in string.ascii_uppercase:
+        if letra == 'C':
+            continue
+        caminho = f"{letra}:\\"
+        if os.path.exists(caminho):
+            pasta = f"{letra}:\\Processos_SIGED"
+            try:
+                os.makedirs(pasta, exist_ok=True)
+                PASTA_DESTINO = pasta
+                print(f'[INIT] HD detectado em {letra}:\\', flush=True)
+                break
+            except:
+                pass
 
 if not PASTA_DESTINO:
     PASTA_DESTINO = os.getenv('PASTA_DESTINO', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads'))
-    print(f'[INIT] Usando pasta local: {PASTA_DESTINO}', flush=True)
+    print(f'[INIT] Usando pasta: {PASTA_DESTINO}', flush=True)
 
 event_queue = queue.Queue()
 execution_active = False
@@ -48,7 +57,7 @@ def run_automation(processos):
 
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False, args=['--disable-blink-features=AutomationControlled', '--no-sandbox'])
+            browser = p.chromium.launch(headless=HEADLESS, args=['--disable-blink-features=AutomationControlled', '--no-sandbox'])
             context = browser.new_context(viewport={'width': 1400, 'height': 900}, user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36', locale='pt-BR', timezone_id='America/Manaus')
             page = context.new_page()
 
@@ -149,7 +158,7 @@ def run_automation(processos):
                         nome_pdf = f"{processo_limpo}.pdf"
                         caminho_pdf = os.path.join(PASTA_DESTINO, nome_pdf)
 
-                        # ESTRATÉGIA 1: Extrair URL real do PDF via JavaScript
+                        # ESTRATEGIA 1: Extrair URL real do PDF via JavaScript
                         if viewer_frame and not download_ok:
                             try:
                                 pdf_url = viewer_frame.evaluate("() => { try { return PDFViewerApplication.url; } catch(e) { return null; } }")
@@ -170,7 +179,7 @@ def run_automation(processos):
                             except Exception as e:
                                 emit('info', f'   ⚠️ JS: {str(e)[:40]}')
 
-                        # ESTRATÉGIA 2: Clicar no botao #download
+                        # ESTRATEGIA 2: Clicar no botao #download
                         if viewer_frame and not download_ok:
                             try:
                                 emit('info', '   🔘 Clicando #download...')
@@ -184,7 +193,7 @@ def run_automation(processos):
                             except Exception as e:
                                 emit('info', f'   ⚠️ #download: {str(e)[:60]}')
 
-                        # ESTRATÉGIA 3: Monitorar requisicoes de rede
+                        # ESTRATEGIA 3: Monitorar requisicoes de rede
                         if not download_ok:
                             try:
                                 emit('info', '   📡 Monitorando rede...')
