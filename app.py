@@ -112,16 +112,24 @@ def run_automation(processos):
             emit('info', '🔑 Acessando página de login...')
             
             try:
-                page.goto(SITE_URL, wait_until='domcontentloaded', timeout=30000)
+                # Timeout maior (120s) pois o site pode estar lento dos EUA
+                page.goto(SITE_URL, wait_until='domcontentloaded', timeout=120000)
                 print(f'[DEBUG] Página carregada! URL: {page.url}', flush=True)
             except Exception as e:
                 print(f'[DEBUG] Erro ao carregar página: {e}', flush=True)
-                emit('erro', f'❌ Erro ao carregar página: {str(e)[:100]}')
-                time.sleep(30)
-                browser.close()
-                execution_active = False
-                emit('fim', '')
-                return
+                # Tenta novamente com mais tempo
+                try:
+                    emit('info', '   🔄 Tentando novamente com mais tempo...')
+                    page.goto(SITE_URL, wait_until='domcontentloaded', timeout=120000)
+                    print(f'[DEBUG] Página carregada na 2a tentativa! URL: {page.url}', flush=True)
+                except Exception as e2:
+                    print(f'[DEBUG] Erro na 2a tentativa: {e2}', flush=True)
+                    emit('erro', f'❌ Erro ao carregar página: {str(e)[:100]}')
+                    time.sleep(30)
+                    browser.close()
+                    execution_active = False
+                    emit('fim', '')
+                    return
             
             time.sleep(3)
             
