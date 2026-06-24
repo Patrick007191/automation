@@ -9,6 +9,13 @@ from pathlib import Path
 from flask import Flask, render_template, request, Response, jsonify
 from dotenv import load_dotenv
 
+# Importa pyautogui para clicar por coordenadas (apenas no Windows local)
+try:
+    import pyautogui
+    PYAUTOGUI_DISPONIVEL = True
+except ImportError:
+    PYAUTOGUI_DISPONIVEL = False
+
 load_dotenv()
 
 # NOTA: playwright importado APENAS dentro de run_automation()
@@ -796,11 +803,24 @@ def run_automation(processos):
                                     emit('sucesso', f'   ✅ Documento aberto! {url_destino[:60]}')
                                     emit('info', f'   👉 Uma nova aba abriu no navegador - CLIQUE NO ÍCONE DE DOWNLOAD 📥')
                                     
-                                    # NÃO fecha a nova aba - deixa ABERTA para o usuário baixar
+                                # NÃO fecha a nova aba - deixa ABERTA para o usuário baixar
                                     download_realizado = True
                                     
-                                    # Aguarda o usuário baixar (60s)
-                                    emit('info', f'   ⏳ Aguardando você baixar o PDF (60 segundos)...')
+                                    # Usa PYAUTOGUI para clicar no botão de download (ícone de pasta no canto superior direito)
+                                    if PYAUTOGUI_DISPONIVEL:
+                                        try:
+                                            emit('info', f'   🤖 Clicando no botão de download (pyautogui)...')
+                                            # Coordenadas do botão de download (canto superior direito)
+                                            # Ajuste essas coordenadas conforme a resolução da sua tela
+                                            pyautogui.click(0.961, 0.173)  # x=961, y=173 (1080p)
+                                            emit('sucesso', f'   ✅ Clique realizado!')
+                                            time.sleep(2)
+                                        except Exception as e:
+                                            print(f'[PYAUTOGUI] Erro: {e}', flush=True)
+                                            emit('info', f'   ⏳ Aguardando você baixar o PDF (60 segundos)...')
+                                    else:
+                                        emit('info', f'   ⏳ Aguardando você baixar o PDF (60 segundos)...')
+                                    
                                     time.sleep(60)
                                     
                                 except Exception as e:
