@@ -145,7 +145,8 @@ def run_automation(processos):
                                 emit('info', f'   ✅ Frame PDF.js encontrado')
                         
                         download_ok = False
-                        nome_pdf = f"{processo.replace('/','_').replace('\\','_').replace('.','_')}.pdf"
+                        processo_limpo = processo.replace('/','_').replace('\\','_').replace('.','_')
+                        nome_pdf = f"{processo_limpo}.pdf"
                         caminho_pdf = os.path.join(PASTA_DESTINO, nome_pdf)
 
                         # ESTRATÉGIA 1: Extrair URL real do PDF via JavaScript
