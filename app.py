@@ -62,7 +62,19 @@ def run_automation(processos):
             page = context.new_page()
 
             emit('info', '🔑 Acessando site...')
-            page.goto(SITE_URL, wait_until='domcontentloaded', timeout=120000)
+            for tentativa in range(3):
+                try:
+                    page.goto(SITE_URL, wait_until='domcontentloaded', timeout=300000)
+                    break
+                except Exception as e:
+                    emit('info', f'   ⚠️ Tentativa {tentativa+1}/3...')
+                    if tentativa == 2:
+                        emit('erro', f'❌ Site não acessou: {str(e)[:80]}')
+                        browser.close()
+                        execution_active = False
+                        emit('fim', '')
+                        return
+                    time.sleep(5)
             time.sleep(2)
 
             emit('info', '   🔍 Fazendo login...')
