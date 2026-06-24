@@ -743,7 +743,8 @@ def run_automation(processos):
                     # -------------------------------------------------------
                     emit('info', '   👁️ Clicando em VISUALIZAR...')
                     download_realizado = False
-                    nome_arquivo = f'processo_{processo.replace("/","_").replace("\\","_").replace(".","_")}.pdf'
+                    processo_limpo = processo.replace("/","_").replace("\\","_").replace(".","_")
+                    nome_arquivo = f'processo_{processo_limpo}.pdf'
 
                     if visualizar:
                         try:
@@ -809,10 +810,11 @@ def run_automation(processos):
                                     # Usa PYAUTOGUI para clicar no botão de download (ícone no canto superior direito)
                                     if PYAUTOGUI_DISPONIVEL:
                                         try:
+                                            # Desativa fail-safe (que trava quando o mouse chega no canto)
+                                            pyautogui.FAILSAFE = False
                                             emit('info', f'   🤖 Clicando no botão de download (pyautogui)...')
                                             # Coordenadas do botão de download baseado no print (toolbar Chrome superior direita)
                                             # x=0.972 (97.2% da largura), y=0.110 (11% da altura)
-                                            # Para 1920x1080: x≈1867, y≈119
                                             pyautogui.click(0.972, 0.110)
                                             emit('sucesso', f'   ✅ Clique no download realizado!')
                                             time.sleep(3)
