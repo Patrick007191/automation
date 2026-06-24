@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automação SIGED - Download de Processos</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: #fff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 30px; }
+        h1 { color: #1a73e8; margin-bottom: 8px; font-size: 22px; }
+        p.subtitle { color: #5f6368; margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin-bottom: 6px; color: #333; }
+        textarea { width: 100%; height: 200px; padding: 12px; border: 1px solid #dadce0; border-radius: 8px; font-size: 14px; resize: vertical; font-family: 'Consolas', monospace; }
+        textarea:focus { outline: none; border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+        .info { background: #e8f0fe; border-left: 4px solid #1a73e8; padding: 10px 14px; border-radius: 4px; font-size: 13px; color: #1967d2; margin: 12px 0; }
+        .botoes { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+        button { padding: 12px 28px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-primary { background: #1a73e8; color: #fff; }
+        .btn-primary:hover { background: #1557b0; }
+        .btn-primary:disabled { background: #a8c7fa; cursor: not-allowed; }
+        .btn-secondary { background: #5f6368; color: #fff; }
+        .btn-secondary:hover { background: #3c4043; }
+        #status { margin-top: 20px; background: #f8f9fa; border-radius: 8px; padding: 14px; max-height: 300px; overflow-y: auto; font-size: 13px; font-family: 'Consolas', monospace; white-space: pre-wrap; line-height: 1.6; border: 1px solid #dadce0; }
+        .status-line { padding: 2px 0; }
+        .sucesso { color: #1e8e3e; }
+        .erro { color: #d93025; }
+        .info-line { color: #1a73e8; }
+        .destino { margin-top: 14px; padding: 10px; background: #fef7e0; border-radius: 6px; font-size: 13px; color: #5f6368; }
+        .destino strong { color: #333; }
+        .progresso { margin-top: 12px; display: none; }
+        .barra { width: 100%; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden; }
+        .barra-preenchimento { height: 100%; width: 0%; background: #1a73e8; transition: width 0.3s; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📄 Automação SIGED - Download de Processos</h1>
+    <p class="subtitle">Cole abaixo os números dos processos (um por linha) para baixar automaticamente</p>
+
+    <div class="info">
+        ℹ️ Os processos serão salvos em: <strong id="pasta-exibida">aguardando...</strong>
+    </div>
+
+    <label for="processos">Números dos processos:</label>
+    <textarea id="processos" placeholder="Exemplo:&#10;2023/12345&#10;2024/67890&#10;2025/111213"></textarea>
+
+    <div class="botoes">
+        <button id="btnIniciar" class="btn-primary" onclick="iniciar()">▶ Iniciar Downloads</button>
+        <button id="btnLimpar" class="btn-secondary" onclick="limpar()">🗑 Limpar</button>
+    </div>
+
+    <div id="progressoContainer" class="progresso">
+        <div class="barra"><div id="barraPreenchimento" class="barra-preenchimento"></div></div>
+    </div>
+
+    <div id="status">Aguardando processos...</div>
+
+    <div class="destino">
+        📂 Pasta de destino: <strong id="pasta-destino-footer">aguardando...</strong><br>
+        📁 Todos os PDFs são salvos dentro da pasta do projeto (portátil)
+    </div>
+</div>
+
+<script>
+let executando = false;
+
+function limpar() {
+    if (executando) return;
+    document.getElementById('processos').value = '';
+    document.getElementById('status').innerHTML = 'Aguardando processos...';
+    document.getElementById('barraPreenchimento').style.width = '0%';
+    document.getElementById('progressoContainer').style.display = 'none';
+}
+
+function adicionarLinhaStatus(tipo, texto) {
+    const div = document.getElementById('status');
+    const classe = tipo === 'sucesso' ? 'sucesso' : tipo === 'erro' ? 'erro' : 'info-line';
+    div.innerHTML += `<div class="status-line ${classe}">${texto}</div>`;
+    div.scrollTop = div.scrollHeight;
+}
+
+function iniciar() {
+    if (executando) return;
+    const textarea = document.getElementById('processos');
+    const processos = textarea.value.split('\n').map(p => p.trim()).filter(p => p.length > 0);
+    if (processos.length === 0) {
+        adicionarLinhaStatus('erro', '❌ Nenhum processo informado.');
+        return;
+    }
+
+    executando = true;
+    document.getElementById('btnIniciar').disabled = true;
+    document.getElementById('progressoContainer').style.display = 'block';
+    document.getElementById('status').innerHTML = '';
+
+    adicionarLinhaStatus('info', `🔍 Iniciando automação para ${processos.length} processos...`);
+    adicionarLinhaStatus('info', `📂 Salvando em: ${pastaDestino}`);
+    adicionarLinhaStatus('info', '⏳ O navegador será aberto automaticamente.\n');
+
+    fetch('/iniciar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ processos })
+    });
+
+    conectarSSE(processos.length);
+}
+
+// Busca configuracao da pasta ao carregar
+let pastaDestino = 'downloads';
+
+fetch('/config')
+    .then(r => r.json())
+    .then(data => {
+        pastaDestino = data.pasta_destino || 'downloads';
+        document.getElementById('pasta-exibida').textContent = pastaDestino;
+        document.getElementById('pasta-destino-footer').textContent = pastaDestino;
+    })
+    .catch(() => {
+        document.getElementById('pasta-exibida').textContent = 'downloads/';
+        document.getElementById('pasta-destino-footer').textContent = 'downloads/';
+    });
+
+function conectarSSE(total) {
+    const evtSource = new EventSource('/progresso');
+    evtSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        if (data.tipo === 'info') {
+            adicionarLinhaStatus('info', data.msg);
+        } else if (data.tipo === 'sucesso') {
+            adicionarLinhaStatus('sucesso', data.msg);
+        } else if (data.tipo === 'erro') {
+            adicionarLinhaStatus('erro', data.msg);
+        } else if (data.tipo === 'progresso' && total > 0) {
+            const pct = Math.min((data.concluidos / total) * 100, 100);
+            document.getElementById('barraPreenchimento').style.width = pct + '%';
+        } else if (data.tipo === 'fim') {
+            evtSource.close();
+            executando = false;
+            document.getElementById('btnIniciar').disabled = false;
+            adicionarLinhaStatus('info', `\n✅ Automação finalizada! Verifique a pasta: ${pastaDestino}`);
+        }
+    };
+    evtSource.onerror = function() {
+        evtSource.close();
+        executando = false;
+        document.getElementById('btnIniciar').disabled = false;
+    };
+}
+</script>
+</body>
+</html>

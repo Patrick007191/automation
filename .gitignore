@@ -15,8 +15,12 @@ __pycache__/
 # === Downloads e Arquivos Gerados ===
 downloads/
 *.pdf
-*.html
 _debug_*
+# Não ignorar templates HTML (necessários para o app)
+!templates/
+!templates/*.html
+# Ignorar apenas HTMLs na raiz (debug, etc.)
+/*.html
 
 # === IDE e Sistema ===
 .vscode/
