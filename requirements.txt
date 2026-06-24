@@ -2,5 +2,3 @@ flask>=3.0
 playwright>=1.40
 python-dotenv>=1.0
 gunicorn>=20.0
-pyautogui>=0.9.54
-pillow>=10.0.0
