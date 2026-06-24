@@ -806,15 +806,16 @@ def run_automation(processos):
                                 # NÃO fecha a nova aba - deixa ABERTA para o usuário baixar
                                     download_realizado = True
                                     
-                                    # Usa PYAUTOGUI para clicar no botão de download (ícone de pasta no canto superior direito)
+                                    # Usa PYAUTOGUI para clicar no botão de download (ícone no canto superior direito)
                                     if PYAUTOGUI_DISPONIVEL:
                                         try:
                                             emit('info', f'   🤖 Clicando no botão de download (pyautogui)...')
-                                            # Coordenadas do botão de download (canto superior direito)
-                                            # Ajuste essas coordenadas conforme a resolução da sua tela
-                                            pyautogui.click(0.961, 0.173)  # x=961, y=173 (1080p)
-                                            emit('sucesso', f'   ✅ Clique realizado!')
-                                            time.sleep(2)
+                                            # Coordenadas do botão de download baseado no print (toolbar Chrome superior direita)
+                                            # x=0.972 (97.2% da largura), y=0.110 (11% da altura)
+                                            # Para 1920x1080: x≈1867, y≈119
+                                            pyautogui.click(0.972, 0.110)
+                                            emit('sucesso', f'   ✅ Clique no download realizado!')
+                                            time.sleep(3)
                                         except Exception as e:
                                             print(f'[PYAUTOGUI] Erro: {e}', flush=True)
                                             emit('info', f'   ⏳ Aguardando você baixar o PDF (60 segundos)...')
