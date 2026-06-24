@@ -17,7 +17,8 @@ load_dotenv()
 # === DETECTA AMBIENTE: cloud vs local ===
 IS_CLOUD = os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER') or os.environ.get('DYNO')
 IS_CLOUD = bool(IS_CLOUD)
-HEADLESS = os.environ.get('HEADLESS', 'true' if IS_CLOUD else 'false').lower() == 'true'
+# SEMPRE abre navegador COM interface gráfica (visível)
+HEADLESS = False
 
 if IS_CLOUD:
     print('[INIT] Modo CLOUD detectado - rodando headless', flush=True)
@@ -453,9 +454,9 @@ def run_automation(processos):
                         page.screenshot(path=os.path.join(PASTA_DESTINO, '_erro_login_falhou.png'))
                     except:
                         pass
-                    print('[DEBUG] Navegador aberto para inspeção por 60s', flush=True)
-                    emit('info', '⚠️ Navegador aberto para inspeção por 60s')
-                    time.sleep(60)
+                    print('[DEBUG] Navegador aberto para inspeção por 5s', flush=True)
+                    emit('info', '⚠️ Navegador aberto para inspeção por 5s')
+                    time.sleep(5)
                     browser.close()
                     execution_active = False
                     emit('fim', '')
@@ -473,7 +474,7 @@ def run_automation(processos):
             # PASSO 2: DEBUG DA PÁGINA APÓS LOGIN
             # ============================================================
             print('[DEBUG] Aguardando página carregar completamente...', flush=True)
-            time.sleep(3)
+            time.sleep(1)
             try:
                 page.wait_for_load_state('networkidle', timeout=20000)
             except:
@@ -730,124 +731,101 @@ def run_automation(processos):
                         except Exception as e:
                             print(f'[DEBUG] Erro get_by_text regex: {e}', flush=True)
 
-                    if visualizar:
-                        emit('sucesso', '   ✅ Botão VISUALIZAR encontrado! Clicando...')
-                        
-                        # Prepara para capturar nova aba
-                        nova_aba_aberta = False
-                        try:
-                            with context.expect_page(timeout=15000) as new_page_info:
-                                visualizar.click(force=True)
-                                time.sleep(3)
-
-                            new_page = new_page_info.value
-                            emit('sucesso', '   ✅ Nova aba aberta com o processo!')
-                            nova_aba_aberta = True
-                        except Exception as e:
-                            emit('info', f'   ⚠️ expect_page falhou: {str(e)[:100]}. Tentando método alternativo...')
-                            
-                            # Tenta clicar novamente com force
-                            try:
-                                visualizar.click(force=True)
-                                time.sleep(3)
-                            except:
-                                pass
-                            
-                            # Pega a última aba aberta
-                            time.sleep(2)
-                            pages = context.pages
-                            if len(pages) > 1:
-                                new_page = pages[-1]
-                                emit('sucesso', '   ✅ Nova aba identificada!')
-                                nova_aba_aberta = True
-                            else:
-                                emit('erro', '   ❌ Nova aba não abriu')
-                                page.screenshot(path=os.path.join(PASTA_DESTINO, f'_erro_aba_{processo.replace("/","_")}.png'))
-                                continue
-                        
-                        # AGUARDA A PÁGINA CARREGAR COMPLETAMENTE
-                        if nova_aba_aberta:
-                            emit('info', '   ⏳ Aguardando documento carregar...')
-                            time.sleep(3)
-                            try:
-                                new_page.wait_for_load_state('networkidle', timeout=60000)
-                                time.sleep(3)
-                            except Exception as e:
-                                print(f'[DEBUG] Aguardando carregamento: {e}', flush=True)
-                                time.sleep(5)
-                            
-                            # Aguarda mais um pouco para garantir que o visualizador de PDF carregou
-                            time.sleep(5)
-                            
-                            try:
-                                titulo = new_page.title()
-                                print(f'[DEBUG] Título da nova aba: {titulo}', flush=True)
-                                emit('info', f'   📄 Documento: {titulo[:50]}')
-                            except:
-                                pass
-                    else:
-                        emit('erro', '   ❌ Não encontrou botão VISUALIZAR')
-                        page.screenshot(path=os.path.join(PASTA_DESTINO, f'_erro_visualizar_{processo.replace("/","_")}.png'))
-                        continue
-
                     # -------------------------------------------------------
-                    # E) BAIXA O PDF - USA MÓDULO EXTERNO COM PYTHON PARA CTRL+S
+                    # E) CLICA EM VISUALIZAR E ESPERA O DOWNLOAD AUTOMÁTICO
                     # -------------------------------------------------------
-                    emit('info', '   📥 Baixando documento PDF...')
+                    emit('info', '   👁️ Clicando em VISUALIZAR...')
                     download_realizado = False
+                    nome_arquivo = f'processo_{processo.replace("/","_").replace("\\","_").replace(".","_")}.pdf'
 
-                    try:
-                        nome_arquivo = f'processo_{processo.replace("/","_").replace("\\","_").replace(".","_")}.pdf'
-                        destino = os.path.join(PASTA_DESTINO, nome_arquivo)
-                        if len(destino) > 255:
-                            nome_base = f'processo_{processo.split(".")[0]}.pdf'
-                            destino = os.path.join(PASTA_DESTINO, nome_base)
-
-                        # Foca na guia do visualizador
-                        new_page.bring_to_front()
-                        time.sleep(2)
-
-                        # Aguarda carregar completamente
-                        emit('info', '   ⏳ Aguardando página carregar...')
-                        time.sleep(5)
+                    if visualizar:
                         try:
-                            new_page.wait_for_load_state('networkidle', timeout=30000)
-                        except:
-                            pass
-                        time.sleep(3)
+                            # ESTRATÉGIA: Usa expect_download para capturar o arquivo
+                            # automaticamente quando o VISUALIZAR for clicado
+                            caminho_pdf = os.path.join(PASTA_DESTINO, nome_arquivo)
+                            
+                            # Remove arquivo antigo se existir
+                            if os.path.exists(caminho_pdf):
+                                os.remove(caminho_pdf)
+                            
+                            emit('info', '   💾 Aguardando download iniciar...')
+                            
+                            # Captura o download quando o VISUALIZAR for clicado
+                            with page.expect_download(timeout=60000) as download_info:
+                                visualizar.click(force=True)
+                            
+                            # Download iniciado!
+                            download = download_info.value
+                            
+                            # Salva com o nome desejado
+                            download.save_as(caminho_pdf)
+                            
+                            # Verifica se o arquivo foi salvo
+                            if os.path.exists(caminho_pdf):
+                                tamanho = os.path.getsize(caminho_pdf)
+                                if tamanho > 5000:  # Mínimo 5KB para ser um PDF válido
+                                    emit('sucesso', f'   ✅ Download: {nome_arquivo} ({tamanho//1024} KB)')
+                                    download_realizado = True
+                                    print(f'[DEBUG] Download OK: {caminho_pdf}', flush=True)
+                                else:
+                                    emit('erro', f'   ❌ Arquivo muito pequeno: {tamanho} bytes')
+                            else:
+                                emit('erro', '   ❌ Arquivo não foi salvo')
+                                
+                        except Exception as e:
+                            print(f'[DEBUG] Erro no download: {e}', flush=True)
+                            emit('erro', f'   ❌ Erro: {str(e)[:100]}')
+                            
+                            # SOLUÇÃO: Impede nova aba e captura a URL para download direto
+                            emit('info', '   🔗 Capturando URL do documento...')
+                            download_realizado = False
+                            
+                            # Configura listener para capturar o download ANTES de clicar
+                            try:
+                                caminho_pdf = os.path.join(PASTA_DESTINO, nome_arquivo)
+                                
+                                # Captura a URL e MANTÉM a nova aba aberta
+                                url_destino = None
+                                nova_aba = None
+                                with context.expect_page(timeout=10000) as new_page_info:
+                                    visualizar.click(force=True)
+                                
+                                try:
+                                    nova_aba = new_page_info.value
+                                    url_destino = nova_aba.url
+                                    emit('sucesso', f'   ✅ Documento aberto! {url_destino[:60]}')
+                                    emit('info', f'   👉 Uma nova aba abriu no navegador - CLIQUE NO ÍCONE DE DOWNLOAD 📥')
+                                    
+                                    # NÃO fecha a nova aba - deixa ABERTA para o usuário baixar
+                                    download_realizado = True
+                                    
+                                    # Aguarda o usuário baixar (60s)
+                                    emit('info', f'   ⏳ Aguardando você baixar o PDF (60 segundos)...')
+                                    time.sleep(60)
+                                    
+                                except Exception as e:
+                                    print(f'[DEBUG] Erro ao capturar nova aba: {e}', flush=True)
+                                
+                                if not download_realizado:
+                                    emit('erro', '   ❌ Download não realizado')
+                                    
+                            except Exception as e:
+                                print(f'[DEBUG] Erro ao capturar URL: {e}', flush=True)
+                                emit('erro', f'   ❌ Erro: {str(e)[:100]}')
+                                
+                        except Exception as e:
+                            print(f'[DEBUG] Erro geral no fluxo VISUALIZAR: {e}', flush=True)
+                            emit('erro', f'   ❌ Erro: {str(e)[:100]}')
+                    else:
+                        emit('erro', '   ❌ Botão VISUALIZAR não encontrado')
+                        page.screenshot(path=os.path.join(PASTA_DESTINO, f'_erro_visualizar_{processo.replace("/","_")}.png'))
 
-                        # Verifica se a página realmente carregou
-                        try:
-                            titulo = new_page.title()
-                            print(f'[DEBUG] Título da página: {titulo}', flush=True)
-                        except:
-                            pass
-
-                        # Baixa o PDF usando a API nativa de download do Playwright
-                        print(f'[DEBUG] Chamando auto_download.py...', flush=True)
-                        emit('info', f'   💾 Baixando: {os.path.basename(destino)}')
-                        
-                        from auto_download import baixar_pdf
-                        sucesso, caminho_arquivo = baixar_pdf(new_page, PASTA_DESTINO, nome_arquivo)
-                        
-                        if sucesso:
-                            emit('sucesso', f'   ✅ Download: {os.path.basename(caminho_arquivo)}')
-                            download_realizado = True
-                        else:
-                            emit('erro', '   ❌ Download não confirmado')
-
-                    except Exception as e:
-                        print(f'[DEBUG] Erro no download: {e}', flush=True)
-                        emit('erro', f'   ❌ Erro: {str(e)[:100]}')
-
-                    # NÃO fecha a aba — deixa o documento aberto para o usuário ver/baixar
                     # Volta para a página principal
                     try:
                         if page and not page.is_closed():
                             page.bring_to_front()
                     except:
                         pass
-
                     time.sleep(1)
 
                 except Exception as e:
