@@ -873,6 +873,13 @@ def run_automation(processos):
 
 # ===== ROTAS FLASK =====
 
+@app.route('/health')
+@app.route('/ping')
+def health_check():
+    """Health check obrigatório para Railway/Render."""
+    return 'OK', 200
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
